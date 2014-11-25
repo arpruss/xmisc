@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="mobi.omegacentauri.xmisc"
+    android:versionCode="4"
+    android:versionName="0.01" >
+
+    <!-- <uses-permission android:name="android.permission.ACCESS_SUPERUSER" /> -->
+
+    <application android:label="XMisc" >
+        <meta-data
+            android:name="xposedmodule"
+            android:value="true" />
+        <meta-data
+            android:name="xposeddescription"
+            android:value="Miscellaneous hacks" />
+        <meta-data
+            android:name="xposedminversion"
+            android:value="30" />
+
+        <activity android:name=".Main"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize"
+            android:label="XMisc"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        </application>
+
+    <uses-sdk
+        android:minSdkVersion="13"
+        android:targetSdkVersion="17" />
+
+</manifest>
