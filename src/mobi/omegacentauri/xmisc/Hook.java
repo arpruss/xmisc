@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
+import android.content.res.TypedArray;
 import android.content.res.XModuleResources;
 import android.content.res.XResources;
 import android.graphics.Color;
@@ -23,7 +24,7 @@ import de.robv.android.xposed.callbacks.XC_InitPackageResources.InitPackageResou
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 import static de.robv.android.xposed.XposedHelpers.findAndHookMethod;
 
-public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
+public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, IXposedHookInitPackageResources */ {
     static String MODULE_PATH;
     static final String[] replace = {
     	"auction_highestBid_purple.png",
@@ -54,6 +55,19 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
 		
 	}
 
+//	@Override
+//    public void handleInitPackageResources(InitPackageResourcesParam resparam) throws Throwable {
+//        if (!resparam.packageName.equals("com.amazon.kindle"))
+//            return;
+//
+////        XposedBridge.log("kindle subst");
+////        XModuleResources modRes = XModuleResources.createInstance(MODULE_PATH, resparam.res);
+////        resparam.res.setReplacement("com.amazon.kindle", "array", "page_margins_user_settings", 
+////        		modRes.fwd(R.array.page_margins_user_settings));
+////        resparam.res.setReplacement("com.amazon.kindle", "array", "vertical_page_margins_user_settings", 
+////        		modRes.fwd(R.array.vertical_page_margins_user_settings));
+//    }
+	
 	@Override
 	public void handleLoadPackage(LoadPackageParam lpparam) throws Throwable {
 		XSharedPreferences prefs = new XSharedPreferences(Main.class.getPackage().getName(), Main.PREFS);
@@ -61,6 +75,83 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
 		if (prefs.getBoolean(Main.PREF_FIX_MONOPOLY, false) &&
 				lpparam.packageName.startsWith("com.eamobile.monopoly_full"))
 			monoPatch(lpparam);
+		else if (prefs.getBoolean(Main.PREF_FIX_KINDLE, false) &&
+				lpparam.packageName.startsWith("com.amazon.kindle"))
+			kindlePatch(lpparam);
+	}
+	
+	public void kindlePatch(LoadPackageParam lpparam) {
+		findAndHookMethod("android.content.res.Resources", lpparam.classLoader,
+				"getDimensionPixelSize", int.class, new XC_MethodHook() {
+			@Override
+			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+				if (0x7f08012c == (Integer)param.args[0]) {
+//					XposedBridge.log("top_margin ps "+(Integer)param.getResult());
+					param.setResult((Integer)4);
+				}
+				else if (0x7f08012d == (Integer)param.args[0]) {
+//					XposedBridge.log("bottom_margin ps "+(Integer)param.getResult());
+					param.setResult((Integer)20);
+				}
+				else if (0x7f08012a == (Integer)param.args[0]) {
+// 			        XposedBridge.log("footer pos");
+					param.setResult((Integer)8);
+				}
+			}
+			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+			}
+		});
+//		findAndHookMethod("android.content.res.Resources", lpparam.classLoader,
+//				"obtainTypedArray", int.class, new XC_MethodHook() {
+//			@Override
+//			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+//				if (0x7f090004  == (Integer)param.args[0]) {
+//					XposedBridge.log("page_margins_user_settings");
+//					XposedBridge.log("set "+((TypedArray)param.getResult()).getDimensionPixelSize(0,  0));
+//					param.setResult(XModuleResources.createInstance(MODULE_PATH, null).obtainTypedArray(R.array.page_margins_user_settings));
+//					XposedBridge.log("set "+((TypedArray)param.getResult()).getDimensionPixelSize(0,  0));
+//				}
+//			}
+//			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+//				XposedBridge.log("obtainTypedArray "+String.format("%08X",(Integer)param.args[0]));
+//			}
+//		});
+		try {
+			findAndHookMethod("com.amazon.android.docviewer.KindleDocLineSettings", 
+					lpparam.classLoader,
+					"getCalculatedHorizontalMargins", 
+					Class.forName("com.amazon.android.docviewer.KindleDocLineSettings$Margin", false, lpparam.classLoader), 
+					int.class,
+					new XC_MethodHook() {
+				@Override
+				protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+					int r = (Integer)param.getResult();
+					param.setResult(r/8);
+				}
+				protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+				}
+			});
+		} catch (ClassNotFoundException e) {
+			XposedBridge.log("Error "+e);
+		}
+//		findAndHookMethod("android.content.res.Resources", lpparam.classLoader,
+//				"getIntArray", int.class, new XC_MethodHook() {
+//			@Override
+//			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+//			}
+//			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+//				XposedBridge.log("getIntArray "+String.format("%08X",(Integer)param.args[0]));
+//			}
+//		});
+//		findAndHookMethod("android.content.res.Resources", lpparam.classLoader,
+//				"getStringArray", int.class, new XC_MethodHook() {
+//			@Override
+//			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+//			}
+//			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+//				XposedBridge.log("getStringArray "+String.format("%08X",(Integer)param.args[0]));
+//			}
+//		});
 	}
 	
 	public void monoPatch(LoadPackageParam lpparam) {

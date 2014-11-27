@@ -15,6 +15,7 @@ public class Main extends Activity {
 	SharedPreferences prefs;
 	final static String PREF_DISABLE_HOLO = "disableHolo";
 	final static String PREF_FIX_MONOPOLY = "fixMonopoly";
+	final static String PREF_FIX_KINDLE = "fixKindle";
 	static final String PREFS = "preferences";
 	
 	@SuppressLint("WorldReadableFiles")
@@ -47,6 +48,16 @@ public class Main extends Activity {
 			@Override
 			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
 				prefs.edit().putBoolean(PREF_FIX_MONOPOLY, isChecked).commit();
+			}
+		});
+        CheckBox kindle = (CheckBox)findViewById(R.id.fix_kindle);
+        
+        kindle.setChecked(prefs.getBoolean(PREF_FIX_KINDLE, false));
+        kindle.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+			
+			@Override
+			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+				prefs.edit().putBoolean(PREF_FIX_KINDLE, isChecked).commit();
 			}
 		});
 	}
