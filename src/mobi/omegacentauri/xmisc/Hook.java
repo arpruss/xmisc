@@ -101,21 +101,21 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
 			}
 		});
-//		findAndHookMethod("android.content.res.Resources", lpparam.classLoader,
-//				"obtainTypedArray", int.class, new XC_MethodHook() {
-//			@Override
-//			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-//				if (0x7f090004  == (Integer)param.args[0]) {
-//					XposedBridge.log("page_margins_user_settings");
-//					XposedBridge.log("set "+((TypedArray)param.getResult()).getDimensionPixelSize(0,  0));
-//					param.setResult(XModuleResources.createInstance(MODULE_PATH, null).obtainTypedArray(R.array.page_margins_user_settings));
-//					XposedBridge.log("set "+((TypedArray)param.getResult()).getDimensionPixelSize(0,  0));
-//				}
-//			}
-//			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-//				XposedBridge.log("obtainTypedArray "+String.format("%08X",(Integer)param.args[0]));
-//			}
-//		});
+		findAndHookMethod("android.content.res.Resources", lpparam.classLoader,
+				"getColor", int.class, new XC_MethodHook() {
+			@Override
+			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+				int r = (Integer)param.getResult();
+				if (r == 0xffc5e7ce) {
+					param.setResult(0xff000000);
+				}
+				else if (r == 0xff3a4b43) {
+					param.setResult(0xff00ff00);
+				}
+			}
+			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+			}
+		});
 		try {
 			findAndHookMethod("com.amazon.android.docviewer.KindleDocLineSettings", 
 					lpparam.classLoader,
