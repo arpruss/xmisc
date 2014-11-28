@@ -14,8 +14,16 @@
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
     android:text="Switch purple to green in Monopoly"/>
-<CheckBox android:id="@+id/fix_kindle"
+<CheckBox android:id="@+id/fix_kindle_h_margins"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
-    android:text="Tiny margins in Kindle app"/>
+    android:text="Tiny horizontal margins in Kindle app"/>
+<CheckBox android:id="@+id/fix_kindle_v_margins"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:text="Tiny vertical margins in Kindle app"/>
+<CheckBox android:id="@+id/fix_kindle_green"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:text="Green mode is green on black in Kindle app"/>
 </LinearLayout>

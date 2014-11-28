@@ -72,15 +72,68 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 	public void handleLoadPackage(LoadPackageParam lpparam) throws Throwable {
 		XSharedPreferences prefs = new XSharedPreferences(Main.class.getPackage().getName(), Main.PREFS);
 
-		if (prefs.getBoolean(Main.PREF_FIX_MONOPOLY, false) &&
-				lpparam.packageName.startsWith("com.eamobile.monopoly_full"))
+		if (!Main.PUBLIC_VERSION && 
+				lpparam.packageName.startsWith("com.eamobile.monopoly_full") &&
+				prefs.getBoolean(Main.PREF_FIX_MONOPOLY, false))
 			monoPatch(lpparam);
-		else if (prefs.getBoolean(Main.PREF_FIX_KINDLE, false) &&
-				lpparam.packageName.startsWith("com.amazon.kindle"))
-			kindlePatch(lpparam);
+		
+		if (lpparam.packageName.equals("com.amazon.kindle")) {
+			if (prefs.getBoolean(Main.PREF_FIX_KINDLE_H_MARGINS, false))
+				kindleHMarginsPatch(lpparam);
+			if (prefs.getBoolean(Main.PREF_FIX_KINDLE_V_MARGINS, false))
+				kindleVMarginsPatch(lpparam);
+			if (prefs.getBoolean(Main.PREF_FIX_KINDLE_GREEN, false))
+				kindleGreenPatch(lpparam);
+		}
 	}
 	
-	public void kindlePatch(LoadPackageParam lpparam) {
+	public void kindleGreenPatch(LoadPackageParam lpparam) {
+		findAndHookMethod("android.content.res.Resources", lpparam.classLoader,
+				"getColor", int.class, new XC_MethodHook() {
+			@Override
+			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+				int r = (Integer)param.getResult();
+				if (r == 0xffc5e7ce) {
+					// green text
+					param.setResult(0xff000000);
+				}
+				else if (r == 0xff3a4b43) {
+					// green background
+					param.setResult(0xff00ff00);
+				}
+				else if ((Integer)param.args[0] == 0x7f0a00c3) {
+					// secondary green text
+					param.setResult(0xff00aa00);
+				}
+			}
+			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+			}
+		});
+	}
+	
+	public void kindleHMarginsPatch(LoadPackageParam lpparam) {
+		try {
+			findAndHookMethod("com.amazon.android.docviewer.KindleDocLineSettings", 
+					lpparam.classLoader,
+					"getCalculatedHorizontalMargins", 
+					Class.forName("com.amazon.android.docviewer.KindleDocLineSettings$Margin", false, lpparam.classLoader), 
+					int.class,
+					new XC_MethodHook() {
+				@Override
+				protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+					int r = (Integer)param.getResult();
+					XposedBridge.log("Correcting margin "+r+" to "+(r/8));
+					param.setResult(r/8);
+				}
+				protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+				}
+			});
+		} catch (ClassNotFoundException e) {
+			XposedBridge.log("Error "+e);
+		}
+	}
+	
+	public void kindleVMarginsPatch(LoadPackageParam lpparam) {
 		findAndHookMethod("android.content.res.Resources", lpparam.classLoader,
 				"getDimensionPixelSize", int.class, new XC_MethodHook() {
 			@Override
@@ -101,59 +154,8 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
 			}
 		});
-		findAndHookMethod("android.content.res.Resources", lpparam.classLoader,
-				"getColor", int.class, new XC_MethodHook() {
-			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-				int r = (Integer)param.getResult();
-				if (r == 0xffc5e7ce) {
-					param.setResult(0xff000000);
-				}
-				else if (r == 0xff3a4b43) {
-					param.setResult(0xff00ff00);
-				}
-			}
-			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-			}
-		});
-		try {
-			findAndHookMethod("com.amazon.android.docviewer.KindleDocLineSettings", 
-					lpparam.classLoader,
-					"getCalculatedHorizontalMargins", 
-					Class.forName("com.amazon.android.docviewer.KindleDocLineSettings$Margin", false, lpparam.classLoader), 
-					int.class,
-					new XC_MethodHook() {
-				@Override
-				protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-					int r = (Integer)param.getResult();
-					param.setResult(r/8);
-				}
-				protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-				}
-			});
-		} catch (ClassNotFoundException e) {
-			XposedBridge.log("Error "+e);
-		}
-//		findAndHookMethod("android.content.res.Resources", lpparam.classLoader,
-//				"getIntArray", int.class, new XC_MethodHook() {
-//			@Override
-//			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-//			}
-//			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-//				XposedBridge.log("getIntArray "+String.format("%08X",(Integer)param.args[0]));
-//			}
-//		});
-//		findAndHookMethod("android.content.res.Resources", lpparam.classLoader,
-//				"getStringArray", int.class, new XC_MethodHook() {
-//			@Override
-//			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-//			}
-//			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-//				XposedBridge.log("getStringArray "+String.format("%08X",(Integer)param.args[0]));
-//			}
-//		});
 	}
-	
+
 	public void monoPatch(LoadPackageParam lpparam) {
 		findAndHookMethod("android.content.res.AssetManager", lpparam.classLoader,
 				"open", String.class, new XC_MethodHook() {

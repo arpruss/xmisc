@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.CompoundButton.OnCheckedChangeListener;
@@ -15,8 +16,11 @@ public class Main extends Activity {
 	SharedPreferences prefs;
 	final static String PREF_DISABLE_HOLO = "disableHolo";
 	final static String PREF_FIX_MONOPOLY = "fixMonopoly";
-	final static String PREF_FIX_KINDLE = "fixKindle";
 	static final String PREFS = "preferences";
+	public static final String PREF_FIX_KINDLE_GREEN = "fixKindleGreen";
+	public static final boolean PUBLIC_VERSION = false;
+	public static final String PREF_FIX_KINDLE_H_MARGINS = "fixKindleHMargins";
+	public static final String PREF_FIX_KINDLE_V_MARGINS = "fixKindleVMargins";
 	
 	@SuppressLint("WorldReadableFiles")
 	@Override
@@ -40,24 +44,24 @@ public class Main extends Activity {
 			}
 		});
 
-        CheckBox mono = (CheckBox)findViewById(R.id.fix_monopoly);
+        if (PUBLIC_VERSION)
+        	findViewById(R.id.fix_monopoly).setVisibility(View.GONE);
+        else
+        	setter(R.id.fix_monopoly, PREF_FIX_MONOPOLY, false);
+        setter(R.id.fix_kindle_h_margins, PREF_FIX_KINDLE_H_MARGINS, false);
+        setter(R.id.fix_kindle_v_margins, PREF_FIX_KINDLE_V_MARGINS, false);
+        setter(R.id.fix_kindle_green, PREF_FIX_KINDLE_GREEN, false);
+	}
+
+	private void setter(int id, final String prefString, boolean defaultState) {
+        CheckBox mono = (CheckBox)findViewById(id);
         
-        mono.setChecked(prefs.getBoolean(PREF_FIX_MONOPOLY, false));
+        mono.setChecked(prefs.getBoolean(prefString, defaultState));
         mono.setOnCheckedChangeListener(new OnCheckedChangeListener() {
 			
 			@Override
 			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-				prefs.edit().putBoolean(PREF_FIX_MONOPOLY, isChecked).commit();
-			}
-		});
-        CheckBox kindle = (CheckBox)findViewById(R.id.fix_kindle);
-        
-        kindle.setChecked(prefs.getBoolean(PREF_FIX_KINDLE, false));
-        kindle.setOnCheckedChangeListener(new OnCheckedChangeListener() {
-			
-			@Override
-			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-				prefs.edit().putBoolean(PREF_FIX_KINDLE, isChecked).commit();
+				prefs.edit().putBoolean(prefString, isChecked).commit();
 			}
 		});
 	}
