@@ -82,8 +82,11 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 				kindleHMarginsPatch(lpparam);
 			if (prefs.getBoolean(Main.PREF_FIX_KINDLE_V_MARGINS, false))
 				kindleVMarginsPatch(lpparam);
-			if (prefs.getBoolean(Main.PREF_FIX_KINDLE_GREEN, false))
+			if (prefs.getBoolean(Main.PREF_FIX_KINDLE_COLORS, false))
 				kindleGreenPatch(lpparam);
+			if (prefs.getBoolean(Main.PREF_KINDLE_FAST_TURN, false))
+				kindleFastTurn(lpparam);
+			kindleFastTurn(lpparam);
 		}
 	}
 	
@@ -93,22 +96,57 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 			@Override
 			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
 				int r = (Integer)param.getResult();
+//				XposedBridge.log("getcolor: "+String.format("%08x %08x", (Integer)param.args[0], 
+//						r));
 				if (r == 0xffc5e7ce) {
-					// green text
+					// green background
 					param.setResult(0xff000000);
 				}
 				else if (r == 0xff3a4b43) {
-					// green background
+					// green text
 					param.setResult(0xff00ff00);
 				}
 				else if ((Integer)param.args[0] == 0x7f0a00c3) {
 					// secondary green text
 					param.setResult(0xff00aa00);
 				}
+				else if (r == 0xff5a4129) {
+					// sepia text
+					param.setResult(0xFF000000);
+				}
+				else if (r == 0xff937d63) {
+					// sepia secondary
+					param.setResult(0xff8e8e8e);
+				}
 			}
 			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
 			}
 		});
+	}
+	
+	public void kindleFastTurn(LoadPackageParam lpparam) {
+		try {
+			findAndHookMethod("com.amazon.kcp.reader.ReaderNavigator", 
+					lpparam.classLoader,
+					"turnPage", 
+					Class.forName("com.amazon.android.docviewer.KindleDocView$PagingDirection", false, lpparam.classLoader), 
+					Class.forName("com.amazon.android.docviewer.KindleDocView$AnimationDirection", false, lpparam.classLoader), 
+					float.class,
+					new XC_MethodHook() {
+				@Override
+				protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+				}
+				protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+					XposedBridge.log("Requested velocity "+(Float)param.args[2]);
+					if (Math.abs((Float)param.args[2]) < 1e-6f) {
+						param.args[2] = (Float)(-1e20f);
+						XposedBridge.log("xRequested velocity "+(Float)param.args[2]);
+					}
+				}
+			});
+		} catch (ClassNotFoundException e) {
+			XposedBridge.log("Error "+e);
+		}
 	}
 	
 	public void kindleHMarginsPatch(LoadPackageParam lpparam) {
@@ -121,9 +159,9 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 					new XC_MethodHook() {
 				@Override
 				protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-					int r = (Integer)param.getResult();
-					XposedBridge.log("Correcting margin "+r+" to "+(r/8));
-					param.setResult(r/8);
+//					int r = (Integer)param.getResult();
+//					XposedBridge.log("Correcting margin "+r+" to "+(r/8));
+					param.setResult(0);
 				}
 				protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
 				}

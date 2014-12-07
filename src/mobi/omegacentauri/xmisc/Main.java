@@ -12,15 +12,16 @@ import android.widget.CompoundButton;
 import android.widget.CompoundButton.OnCheckedChangeListener;
 
 public class Main extends Activity {
+	public static final boolean PUBLIC_VERSION = false;
 	Resources res;
 	SharedPreferences prefs;
 	final static String PREF_DISABLE_HOLO = "disableHolo";
 	final static String PREF_FIX_MONOPOLY = "fixMonopoly";
 	static final String PREFS = "preferences";
-	public static final String PREF_FIX_KINDLE_GREEN = "fixKindleGreen";
-	public static final boolean PUBLIC_VERSION = false;
+	public static final String PREF_FIX_KINDLE_COLORS = "fixKindleGreen";
 	public static final String PREF_FIX_KINDLE_H_MARGINS = "fixKindleHMargins";
 	public static final String PREF_FIX_KINDLE_V_MARGINS = "fixKindleVMargins";
+	public static final String PREF_KINDLE_FAST_TURN = "kindleFastTurn";
 	
 	@SuppressLint("WorldReadableFiles")
 	@Override
@@ -50,7 +51,8 @@ public class Main extends Activity {
         	setter(R.id.fix_monopoly, PREF_FIX_MONOPOLY, false);
         setter(R.id.fix_kindle_h_margins, PREF_FIX_KINDLE_H_MARGINS, false);
         setter(R.id.fix_kindle_v_margins, PREF_FIX_KINDLE_V_MARGINS, false);
-        setter(R.id.fix_kindle_green, PREF_FIX_KINDLE_GREEN, false);
+        setter(R.id.fix_kindle_green, PREF_FIX_KINDLE_COLORS, false);
+        setter(R.id.kindle_fast_turn, PREF_KINDLE_FAST_TURN, false);
 	}
 
 	private void setter(int id, final String prefString, boolean defaultState) {

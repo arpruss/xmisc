@@ -25,5 +25,9 @@
 <CheckBox android:id="@+id/fix_kindle_green"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
-    android:text="Green mode is green on black in Kindle app"/>
+    android:text="Green mode is green on black and sepia text is black in Kindle app"/>
+<CheckBox android:id="@+id/kindle_fast_turn"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:text="Fast page turning in Kindle app"/>
 </LinearLayout>
