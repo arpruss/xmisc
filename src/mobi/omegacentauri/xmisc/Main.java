@@ -22,6 +22,7 @@ public class Main extends Activity {
 	public static final String PREF_FIX_KINDLE_H_MARGINS = "fixKindleHMargins";
 	public static final String PREF_FIX_KINDLE_V_MARGINS = "fixKindleVMargins";
 	public static final String PREF_KINDLE_FAST_TURN = "kindleFastTurn";
+	public static final String PREF_LOG_BT = "logBT";
 	
 	@SuppressLint("WorldReadableFiles")
 	@Override

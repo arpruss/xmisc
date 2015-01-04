@@ -1,7 +1,11 @@
 package mobi.omegacentauri.xmisc;
 
 import java.io.FileNotFoundException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
 
+import android.bluetooth.BluetoothSocket;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -12,6 +16,7 @@ import android.content.res.XResources;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.os.Environment;
 import android.preference.PreferenceManager;
 import android.view.KeyEvent;
 import de.robv.android.xposed.IXposedHookInitPackageResources;
@@ -44,6 +49,7 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 		XSharedPreferences prefs = new XSharedPreferences(Main.class.getPackage().getName(), Main.PREFS);
 		MODULE_PATH = startupParam.modulePath;
 		prefs.makeWorldReadable();
+
 		if (prefs.getBoolean(Main.PREF_DISABLE_HOLO, false))
 			XResources.setSystemWideReplacement(
 					"android", "drawable", "background_holo_dark", new XResources.DrawableLoader() {
@@ -90,6 +96,26 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 		}
 	}
 	
+//	private void btLog(LoadPackageParam lpparam) {
+//		XposedBridge.log("Bluetooth logging enabled");
+//		findAndHookMethod("android.bluetooth.BluetoothSocket", lpparam.classLoader,
+//				"write", byte[].class, int.class, int.class, new XC_MethodHook() {
+//			@Override
+//			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+//				XposedBridge.log("write");
+//				bti.log(true, (byte[])param.args[0], (Integer)param.args[0], (Integer)param.args[1]);
+//			}
+//		});
+//		findAndHookMethod("android.bluetooth.BluetoothSocket", lpparam.classLoader,
+//				"read", byte[].class, int.class, int.class, new XC_MethodHook() {
+//			@Override
+//			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+//				XposedBridge.log("read");
+//				bti.log(false, (byte[])param.args[0], (Integer)param.args[1], (Integer)param.getResult());
+//			}
+//		});
+//	}
+
 	public void kindleGreenPatch(LoadPackageParam lpparam) {
 		findAndHookMethod("android.content.res.Resources", lpparam.classLoader,
 				"getColor", int.class, new XC_MethodHook() {
