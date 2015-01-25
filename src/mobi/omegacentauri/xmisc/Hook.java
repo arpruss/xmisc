@@ -5,10 +5,14 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 
+import android.app.Activity;
 import android.bluetooth.BluetoothSocket;
+import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.content.res.XModuleResources;
@@ -16,9 +20,11 @@ import android.content.res.XResources;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Environment;
 import android.preference.PreferenceManager;
 import android.view.KeyEvent;
+import android.view.Window;
 import de.robv.android.xposed.IXposedHookInitPackageResources;
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.IXposedHookZygoteInit;
@@ -30,20 +36,20 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 import static de.robv.android.xposed.XposedHelpers.findAndHookMethod;
 
 public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, IXposedHookInitPackageResources */ {
-    static String MODULE_PATH;
-    static final String[] replace = {
-    	"auction_highestBid_purple.png",
-    	"auctionMarker_purple.png",
-    	"bubble_purple.png",
-    	"checkbox_purple.png",
-    	"checkbox_purple_checked.png",
-    	"drag_purple.png",
-    	"propertymarker03.pvr",
-    	"tabletop_purple.png",
-    	"tabletop_purpleLg.png",
-    	"tokenhili.pvr"
-    };
-	
+	static String MODULE_PATH;
+	static final String[] replace = {
+		"auction_highestBid_purple.png",
+		"auctionMarker_purple.png",
+		"bubble_purple.png",
+		"checkbox_purple.png",
+		"checkbox_purple_checked.png",
+		"drag_purple.png",
+		"propertymarker03.pvr",
+		"tabletop_purple.png",
+		"tabletop_purpleLg.png",
+		"tokenhili.pvr"
+	};
+
 	@Override
 	public void initZygote(IXposedHookZygoteInit.StartupParam startupParam) throws Throwable {
 		XSharedPreferences prefs = new XSharedPreferences(Main.class.getPackage().getName(), Main.PREFS);
@@ -58,31 +64,81 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 							return new ColorDrawable(Color.BLACK);
 						}
 					});
-		
+
+		if (prefs.getBoolean(Main.PREF_AUTO_FLIP, false))
+			autoFlipGlobalPatch();
+
 	}
 
-//	@Override
-//    public void handleInitPackageResources(InitPackageResourcesParam resparam) throws Throwable {
-//        if (!resparam.packageName.equals("com.amazon.kindle"))
-//            return;
-//
-////        XposedBridge.log("kindle subst");
-////        XModuleResources modRes = XModuleResources.createInstance(MODULE_PATH, resparam.res);
-////        resparam.res.setReplacement("com.amazon.kindle", "array", "page_margins_user_settings", 
-////        		modRes.fwd(R.array.page_margins_user_settings));
-////        resparam.res.setReplacement("com.amazon.kindle", "array", "vertical_page_margins_user_settings", 
-////        		modRes.fwd(R.array.vertical_page_margins_user_settings));
-//    }
-	
+	//	@Override
+	//    public void handleInitPackageResources(InitPackageResourcesParam resparam) throws Throwable {
+	//        if (!resparam.packageName.equals("com.amazon.kindle"))
+	//            return;
+	//
+	////        XposedBridge.log("kindle subst");
+	////        XModuleResources modRes = XModuleResources.createInstance(MODULE_PATH, resparam.res);
+	////        resparam.res.setReplacement("com.amazon.kindle", "array", "page_margins_user_settings", 
+	////        		modRes.fwd(R.array.page_margins_user_settings));
+	////        resparam.res.setReplacement("com.amazon.kindle", "array", "vertical_page_margins_user_settings", 
+	////        		modRes.fwd(R.array.vertical_page_margins_user_settings));
+	//    }
+
+	private void autoFlipGlobalPatch() {
+		findAndHookMethod("com.android.internal.policy.impl.PhoneWindow", null, "generateLayout",
+				"com.android.internal.policy.impl.PhoneWindow.DecorView", new XC_MethodHook() {
+
+			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+				Window window = (Window) param.thisObject;
+				Context context = window.getContext();
+				if (context instanceof Activity) {
+					int oldOrientation = ((Activity)context).getRequestedOrientation();
+					int newOrientation = autoFlipOrientation(oldOrientation);
+					if (newOrientation != oldOrientation) {
+						XposedBridge.log("Overriding orientation to "+newOrientation);
+						((Activity)context).setRequestedOrientation(newOrientation);
+					}
+				}
+			}
+
+		});
+	}
+
+	private int autoFlipOrientation(int oldOrientation) {
+		switch (oldOrientation) {
+		case ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE:
+		case ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE:
+			if (Build.VERSION.SDK_INT >= 18)
+				return ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE;
+			else
+				return ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE;
+		case ActivityInfo.SCREEN_ORIENTATION_PORTRAIT:
+		case ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT:
+			if (Build.VERSION.SDK_INT >= 18)
+				return ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT;
+			else
+				return ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT;
+		case ActivityInfo.SCREEN_ORIENTATION_SENSOR:
+		case ActivityInfo.SCREEN_ORIENTATION_USER:
+			if (Build.VERSION.SDK_INT >= 18)
+				return ActivityInfo.SCREEN_ORIENTATION_FULL_USER;
+			else
+				return ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR;						
+		}
+		return oldOrientation;
+	}
+
 	@Override
 	public void handleLoadPackage(LoadPackageParam lpparam) throws Throwable {
 		XSharedPreferences prefs = new XSharedPreferences(Main.class.getPackage().getName(), Main.PREFS);
+
+		if (prefs.getBoolean(Main.PREF_AUTO_FLIP, false))
+			autoFlipAppPatch(lpparam);
 
 		if (!Main.PUBLIC_VERSION && 
 				lpparam.packageName.startsWith("com.eamobile.monopoly_full") &&
 				prefs.getBoolean(Main.PREF_FIX_MONOPOLY, false))
 			monoPatch(lpparam);
-		
+
 		if (lpparam.packageName.equals("com.amazon.kindle")) {
 			if (prefs.getBoolean(Main.PREF_FIX_KINDLE_H_MARGINS, false))
 				kindleHMarginsPatch(lpparam);
@@ -95,26 +151,42 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 			kindleFastTurn(lpparam);
 		}
 	}
-	
-//	private void btLog(LoadPackageParam lpparam) {
-//		XposedBridge.log("Bluetooth logging enabled");
-//		findAndHookMethod("android.bluetooth.BluetoothSocket", lpparam.classLoader,
-//				"write", byte[].class, int.class, int.class, new XC_MethodHook() {
-//			@Override
-//			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-//				XposedBridge.log("write");
-//				bti.log(true, (byte[])param.args[0], (Integer)param.args[0], (Integer)param.args[1]);
-//			}
-//		});
-//		findAndHookMethod("android.bluetooth.BluetoothSocket", lpparam.classLoader,
-//				"read", byte[].class, int.class, int.class, new XC_MethodHook() {
-//			@Override
-//			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-//				XposedBridge.log("read");
-//				bti.log(false, (byte[])param.args[0], (Integer)param.args[1], (Integer)param.getResult());
-//			}
-//		});
-//	}
+
+	//	private void btLog(LoadPackageParam lpparam) {
+	//		XposedBridge.log("Bluetooth logging enabled");
+	//		findAndHookMethod("android.bluetooth.BluetoothSocket", lpparam.classLoader,
+	//				"write", byte[].class, int.class, int.class, new XC_MethodHook() {
+	//			@Override
+	//			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+	//				XposedBridge.log("write");
+	//				bti.log(true, (byte[])param.args[0], (Integer)param.args[0], (Integer)param.args[1]);
+	//			}
+	//		});
+	//		findAndHookMethod("android.bluetooth.BluetoothSocket", lpparam.classLoader,
+	//				"read", byte[].class, int.class, int.class, new XC_MethodHook() {
+	//			@Override
+	//			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+	//				XposedBridge.log("read");
+	//				bti.log(false, (byte[])param.args[0], (Integer)param.args[1], (Integer)param.getResult());
+	//			}
+	//		});
+	//	}
+
+	private void autoFlipAppPatch(LoadPackageParam lpparam) {
+		findAndHookMethod(Activity.class, "setRequestedOrientation", int.class, new XC_MethodHook() {
+			@Override
+			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+				int oldOrientation = (Integer)param.args[0];
+				int newOrientation = autoFlipOrientation(oldOrientation);
+				if (oldOrientation != newOrientation) {
+					XposedBridge.log("Overriding orientation to "+newOrientation);
+					param.args[0] = (Integer)newOrientation;
+				}
+			}
+
+		});
+	}
+
 
 	public void kindleGreenPatch(LoadPackageParam lpparam) {
 		findAndHookMethod("android.content.res.Resources", lpparam.classLoader,
@@ -122,8 +194,8 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 			@Override
 			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
 				int r = (Integer)param.getResult();
-//				XposedBridge.log("getcolor: "+String.format("%08x %08x", (Integer)param.args[0], 
-//						r));
+				//				XposedBridge.log("getcolor: "+String.format("%08x %08x", (Integer)param.args[0], 
+				//						r));
 				if (r == 0xffc5e7ce) {
 					// green background
 					param.setResult(0xff000000);
@@ -149,7 +221,7 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 			}
 		});
 	}
-	
+
 	public void kindleFastTurn(LoadPackageParam lpparam) {
 		try {
 			findAndHookMethod("com.amazon.kcp.reader.ReaderNavigator", 
@@ -174,7 +246,7 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 			XposedBridge.log("Error "+e);
 		}
 	}
-	
+
 	public void kindleHMarginsPatch(LoadPackageParam lpparam) {
 		try {
 			findAndHookMethod("com.amazon.android.docviewer.KindleDocLineSettings", 
@@ -185,8 +257,8 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 					new XC_MethodHook() {
 				@Override
 				protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-//					int r = (Integer)param.getResult();
-//					XposedBridge.log("Correcting margin "+r+" to "+(r/8));
+					//					int r = (Integer)param.getResult();
+					//					XposedBridge.log("Correcting margin "+r+" to "+(r/8));
 					param.setResult(0);
 				}
 				protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
@@ -196,22 +268,22 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 			XposedBridge.log("Error "+e);
 		}
 	}
-	
+
 	public void kindleVMarginsPatch(LoadPackageParam lpparam) {
 		findAndHookMethod("android.content.res.Resources", lpparam.classLoader,
 				"getDimensionPixelSize", int.class, new XC_MethodHook() {
 			@Override
 			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
 				if (0x7f08012c == (Integer)param.args[0]) {
-//					XposedBridge.log("top_margin ps "+(Integer)param.getResult());
+					//					XposedBridge.log("top_margin ps "+(Integer)param.getResult());
 					param.setResult((Integer)4);
 				}
 				else if (0x7f08012d == (Integer)param.args[0]) {
-//					XposedBridge.log("bottom_margin ps "+(Integer)param.getResult());
+					//					XposedBridge.log("bottom_margin ps "+(Integer)param.getResult());
 					param.setResult((Integer)20);
 				}
 				else if (0x7f08012a == (Integer)param.args[0]) {
-// 			        XposedBridge.log("footer pos");
+					// 			        XposedBridge.log("footer pos");
 					param.setResult((Integer)8);
 				}
 			}
@@ -237,7 +309,7 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 				}
 			}
 			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-//				param.args[0] = monoAssetFix((String)param.args[0]);
+				//				param.args[0] = monoAssetFix((String)param.args[0]);
 			}
 		});
 		findAndHookMethod("android.content.res.AssetManager", lpparam.classLoader,
@@ -256,23 +328,23 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 				}
 			}
 			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-//				param.args[0] = monoAssetFix((String)param.args[0]);
+				//				param.args[0] = monoAssetFix((String)param.args[0]);
 			}
 		});
 	}
-	
-//	static String monoAssetFix(String s) {
-//		return swap(swap(s, "_purple", "_red"),"propertymarker04","propertymarker03");
-//	}
-//	
-//	static String swap(String s, String a, String b) {
-//		if (s.contains(a)) {
-//			return s.replace(a,b);
-//		}
-//		else if (s.contains(b)) {
-//			return s.replace(b, a);
-//		}
-//		else
-//			return s;
-//	}
+
+	//	static String monoAssetFix(String s) {
+	//		return swap(swap(s, "_purple", "_red"),"propertymarker04","propertymarker03");
+	//	}
+	//	
+	//	static String swap(String s, String a, String b) {
+	//		if (s.contains(a)) {
+	//			return s.replace(a,b);
+	//		}
+	//		else if (s.contains(b)) {
+	//			return s.replace(b, a);
+	//		}
+	//		else
+	//			return s;
+	//	}
 }

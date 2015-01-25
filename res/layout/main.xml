@@ -30,4 +30,8 @@
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
     android:text="Fast page turning in Kindle app"/>
+<CheckBox android:id="@+id/auto_flip"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:text="Always allow upside-down orientations"/>
 </LinearLayout>

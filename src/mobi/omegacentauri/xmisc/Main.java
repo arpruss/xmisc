@@ -23,6 +23,7 @@ public class Main extends Activity {
 	public static final String PREF_FIX_KINDLE_V_MARGINS = "fixKindleVMargins";
 	public static final String PREF_KINDLE_FAST_TURN = "kindleFastTurn";
 	public static final String PREF_LOG_BT = "logBT";
+	public static final String PREF_AUTO_FLIP = "autoFlip";
 	
 	@SuppressLint("WorldReadableFiles")
 	@Override
@@ -54,6 +55,7 @@ public class Main extends Activity {
         setter(R.id.fix_kindle_v_margins, PREF_FIX_KINDLE_V_MARGINS, false);
         setter(R.id.fix_kindle_green, PREF_FIX_KINDLE_COLORS, false);
         setter(R.id.kindle_fast_turn, PREF_KINDLE_FAST_TURN, false);
+        setter(R.id.auto_flip, PREF_AUTO_FLIP, false);
 	}
 
 	private void setter(int id, final String prefString, boolean defaultState) {
