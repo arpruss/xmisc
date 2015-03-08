@@ -20,6 +20,7 @@ import android.content.res.XResources;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.hardware.SensorEventListener;
 import android.os.Build;
 import android.os.Environment;
 import android.preference.PreferenceManager;
@@ -31,11 +32,12 @@ import de.robv.android.xposed.IXposedHookZygoteInit;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XSharedPreferences;
 import de.robv.android.xposed.XposedBridge;
+import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_InitPackageResources.InitPackageResourcesParam;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 import static de.robv.android.xposed.XposedHelpers.findAndHookMethod;
 
-public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, IXposedHookInitPackageResources */ {
+public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXposedHookInitPackageResources {
 	static String MODULE_PATH;
 	static final String[] replace = {
 		"auction_highestBid_purple.png",
@@ -49,13 +51,14 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 		"tabletop_purpleLg.png",
 		"tokenhili.pvr"
 	};
+	static int swypeEmojiID = 0;
 
 	@Override
 	public void initZygote(IXposedHookZygoteInit.StartupParam startupParam) throws Throwable {
 		XSharedPreferences prefs = new XSharedPreferences(Main.class.getPackage().getName(), Main.PREFS);
 		MODULE_PATH = startupParam.modulePath;
 		prefs.makeWorldReadable();
-
+		
 		if (prefs.getBoolean(Main.PREF_DISABLE_HOLO, false))
 			XResources.setSystemWideReplacement(
 					"android", "drawable", "background_holo_dark", new XResources.DrawableLoader() {
@@ -70,18 +73,24 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 
 	}
 
-	//	@Override
-	//    public void handleInitPackageResources(InitPackageResourcesParam resparam) throws Throwable {
-	//        if (!resparam.packageName.equals("com.amazon.kindle"))
-	//            return;
-	//
-	////        XposedBridge.log("kindle subst");
-	////        XModuleResources modRes = XModuleResources.createInstance(MODULE_PATH, resparam.res);
-	////        resparam.res.setReplacement("com.amazon.kindle", "array", "page_margins_user_settings", 
-	////        		modRes.fwd(R.array.page_margins_user_settings));
-	////        resparam.res.setReplacement("com.amazon.kindle", "array", "vertical_page_margins_user_settings", 
-	////        		modRes.fwd(R.array.vertical_page_margins_user_settings));
-	//    }
+	@Override
+    public void handleInitPackageResources(InitPackageResourcesParam resparam) throws Throwable {
+		XSharedPreferences prefs = new XSharedPreferences(Main.class.getPackage().getName(), Main.PREFS);
+
+        if (resparam.packageName.startsWith("com.nuance.swype") && 
+        		prefs.getBoolean(Main.PREF_NO_SWYPE_EMOJI, false)
+        		) {
+        	XposedBridge.log("Disable swype emoji");
+        	if (swypeEmojiID == 0) {
+	        	try {
+	        		swypeEmojiID = resparam.res.getIdentifier("enable_emoji_in_english_ldb", "bool", resparam.packageName);
+//	            	if (swypeEmojiID != 0) resparam.res.setReplacement(resparam.packageName, "bool", "enable_emoji_in_english_ldb", false);
+	        	}
+	        	catch (Exception e) {        		
+	        	}
+        	}
+        }
+    }
 
 	private void autoFlipGlobalPatch() {
 		findAndHookMethod("com.android.internal.policy.impl.PhoneWindow", null, "generateLayout",
@@ -131,6 +140,9 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 	public void handleLoadPackage(LoadPackageParam lpparam) throws Throwable {
 		XSharedPreferences prefs = new XSharedPreferences(Main.class.getPackage().getName(), Main.PREFS);
 
+//		if (lpparam.packageName.endsWith(".gm"))
+//			orientationPatch(lpparam);
+		
 		if (prefs.getBoolean(Main.PREF_AUTO_FLIP, false))
 			autoFlipAppPatch(lpparam);
 
@@ -149,8 +161,47 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage /*, I
 			if (prefs.getBoolean(Main.PREF_KINDLE_FAST_TURN, false))
 				kindleFastTurn(lpparam);
 			kindleFastTurn(lpparam);
-		}
+		}		
+		
+		if (lpparam.packageName.startsWith("com.nuance.swype"))
+			swypeNomoji(lpparam);
 	}
+
+	private void swypeNomoji(LoadPackageParam lpparam) {
+		XposedBridge.log("Setting up swype");
+			findAndHookMethod("android.content.res.Resources", lpparam.classLoader,
+					"getBoolean", int.class, new XC_MethodHook() {
+				@Override
+				protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+					if (swypeEmojiID != 0 && (Integer)param.args[0] == swypeEmojiID) {
+//						XposedBridge.log("Disable english emoji (was "+param.getResult()+")");
+						param.setResult(false);
+					}
+				}
+				protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+				}
+			});
+		}
+
+//		XposedHelpers.setStaticIntField(
+//				XposedHelpers.findClass("com.android.internal.policy.impl.PhoneWindowManager$MyOrientationListener$SensorEventListenerImpl", lpparam.classLoader),
+//				"ADJACENT_ORIENTATION_ANGLE_GAP", 180);
+//
+//		findAndHookMethod("com.android.internal.policy.impl.PhoneWindowManager$MyOrientationListener$SensorEventListenerImpl", 
+//					lpparam.classLoader,
+//					"isOrientationAngleAcceptableLocked",
+//					int.class,
+//					int.class,
+//					new XC_MethodHook() {
+//				@Override
+//				protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+//					XposedBridge.log("orientation switch "+(Boolean)param.getResult()+" "+(Integer)param.args[0]+" "+(Integer)param.args[1]);
+//				}
+//				protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+//				}
+//			});
+//		XposedBridge.log("Edited orientation gap");
+//	}
 
 	//	private void btLog(LoadPackageParam lpparam) {
 	//		XposedBridge.log("Bluetooth logging enabled");

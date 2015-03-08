@@ -34,4 +34,8 @@
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
     android:text="Always allow upside-down orientations"/>
+<CheckBox android:id="@+id/no_swype_emoji"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:text="Disable emoji in Swype"/>
 </LinearLayout>
