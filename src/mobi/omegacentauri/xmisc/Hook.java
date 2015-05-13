@@ -3,8 +3,10 @@ package mobi.omegacentauri.xmisc;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.bluetooth.BluetoothSocket;
 import android.content.Context;
@@ -18,14 +20,27 @@ import android.content.res.TypedArray;
 import android.content.res.XModuleResources;
 import android.content.res.XResources;
 import android.graphics.Color;
+import android.graphics.ColorFilter;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
+import android.graphics.Paint;
+import android.graphics.Point;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.hardware.SensorEventListener;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Environment;
 import android.preference.PreferenceManager;
+import android.util.DisplayMetrics;
+import android.view.Display;
 import android.view.KeyEvent;
+import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowManager;
+import android.view.View.MeasureSpec;
+import android.view.WindowManager.LayoutParams;
+import android.widget.FrameLayout;
 import de.robv.android.xposed.IXposedHookInitPackageResources;
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.IXposedHookZygoteInit;
@@ -33,11 +48,12 @@ import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XSharedPreferences;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
+import de.robv.android.xposed.XC_MethodHook.MethodHookParam;
 import de.robv.android.xposed.callbacks.XC_InitPackageResources.InitPackageResourcesParam;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 import static de.robv.android.xposed.XposedHelpers.findAndHookMethod;
 
-public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXposedHookInitPackageResources {
+public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
 	static String MODULE_PATH;
 	static final String[] replace = {
 		"auction_highestBid_purple.png",
@@ -51,14 +67,17 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpo
 		"tabletop_purpleLg.png",
 		"tokenhili.pvr"
 	};
-	static int swypeEmojiID = 0;
+	static final int NOID = -1;
+	static WindowManager wm = null;
 
 	@Override
 	public void initZygote(IXposedHookZygoteInit.StartupParam startupParam) throws Throwable {
 		XSharedPreferences prefs = new XSharedPreferences(Main.class.getPackage().getName(), Main.PREFS);
 		MODULE_PATH = startupParam.modulePath;
 		prefs.makeWorldReadable();
-		
+
+		XposedBridge.log("xmisc: hello");
+
 		if (prefs.getBoolean(Main.PREF_DISABLE_HOLO, false))
 			XResources.setSystemWideReplacement(
 					"android", "drawable", "background_holo_dark", new XResources.DrawableLoader() {
@@ -71,26 +90,63 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpo
 		if (prefs.getBoolean(Main.PREF_AUTO_FLIP, false))
 			autoFlipGlobalPatch();
 
+		if (prefs.getBoolean(Main.PREF_NO_WAKE, false))
+			wirelessWakeupPatch();
 	}
+	
+	private void wirelessWakeupPatch() {
+		XposedBridge.log("xmisc: Wakeup patch");
 
-	@Override
-    public void handleInitPackageResources(InitPackageResourcesParam resparam) throws Throwable {
-		XSharedPreferences prefs = new XSharedPreferences(Main.class.getPackage().getName(), Main.PREFS);
+		findAndHookMethod("com.android.server.power.PowerManagerService", null, 
+				"shouldWakeUpWhenPluggedOrUnpluggedLocked", 
+				boolean.class, int.class, boolean.class,
+				new XC_MethodHook() {
 
-        if (resparam.packageName.startsWith("com.nuance.swype") && 
-        		prefs.getBoolean(Main.PREF_NO_SWYPE_EMOJI, false)
-        		) {
-        	XposedBridge.log("Disable swype emoji");
-        	if (swypeEmojiID == 0) {
-	        	try {
-	        		swypeEmojiID = resparam.res.getIdentifier("enable_emoji_in_english_ldb", "bool", resparam.packageName);
-//	            	if (swypeEmojiID != 0) resparam.res.setReplacement(resparam.packageName, "bool", "enable_emoji_in_english_ldb", false);
-	        	}
-	        	catch (Exception e) {        		
-	        	}
-        	}
-        }
-    }
+			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+//				if (!(Boolean)param.getResult())
+//					return;
+//				Field f = param.thisObject.getClass().getDeclaredField("mPlugType");
+//				f.setAccessible(true);
+//				int plug = (Integer)f.get(param.thisObject);
+				XposedBridge.log("xmisc: query "+(Boolean)param.args[0]+ " "+(Integer)param.args[1]+" "+(Boolean)param.args[2]);
+				XposedBridge.log("xmisc: overrode wakeup");
+				param.setResult(false);
+			}
+
+		});
+
+//		findAndHookMethod("com.android.server.power.Notifier", null, 
+//				"onWirelessChargingStarted", 
+//				new XC_MethodHook() {
+//
+//			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+//				XposedBridge.log("xmisc: wirelesschargingstarted");
+//				param.setResult(null);
+//			}
+//		});
+//
+//		findAndHookMethod("com.android.server.power.Notifier", null, 
+//				"playWirelessChargingStartedSound", 
+//				new XC_MethodHook() {
+//
+//			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+//				XposedBridge.log("xmisc: wirelesschargingsound");
+//				param.setResult(null);
+//			}
+//		});
+//
+//		findAndHookMethod("com.android.server.power.PowerManagerService", null, 
+//				"wakeUpNoUpdateLocked", 
+//				long.class,
+//				new XC_MethodHook() {
+//
+//			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+//				XposedBridge.log("xmisc: wakeUpNoUpdateLocked "+(Long)param.args[0]);
+//			}
+//
+//		});
+	
+	}
 
 	private void autoFlipGlobalPatch() {
 		findAndHookMethod("com.android.internal.policy.impl.PhoneWindow", null, "generateLayout",
@@ -140,11 +196,14 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpo
 	public void handleLoadPackage(LoadPackageParam lpparam) throws Throwable {
 		XSharedPreferences prefs = new XSharedPreferences(Main.class.getPackage().getName(), Main.PREFS);
 
-//		if (lpparam.packageName.endsWith(".gm"))
-//			orientationPatch(lpparam);
-		
+		//		if (lpparam.packageName.endsWith(".gm"))
+		//			orientationPatch(lpparam);
+
 		if (prefs.getBoolean(Main.PREF_AUTO_FLIP, false))
 			autoFlipAppPatch(lpparam);
+
+		//if (lpparam.packageName.startsWith("com.flyersoft"))
+		//			hookPaint(lpparam);
 
 		if (!Main.PUBLIC_VERSION && 
 				lpparam.packageName.startsWith("com.eamobile.monopoly_full") &&
@@ -162,66 +221,27 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpo
 				kindleFastTurn(lpparam);
 			kindleFastTurn(lpparam);
 		}		
-		
-		if (lpparam.packageName.startsWith("com.nuance.swype"))
-			swypeNomoji(lpparam);
+
+//		if (lpparam.packageName.startsWith("com.nuance.swype") &&
+//				prefs.getBoolean(Main.PREF_NO_SWYPE_EMOJI, false))
+//			swypeNoEmoji(lpparam);
+
 	}
 
-	private void swypeNomoji(LoadPackageParam lpparam) {
-		XposedBridge.log("Setting up swype");
-			findAndHookMethod("android.content.res.Resources", lpparam.classLoader,
-					"getBoolean", int.class, new XC_MethodHook() {
-				@Override
-				protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-					if (swypeEmojiID != 0 && (Integer)param.args[0] == swypeEmojiID) {
-//						XposedBridge.log("Disable english emoji (was "+param.getResult()+")");
-						param.setResult(false);
-					}
-				}
-				protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-				}
-			});
-		}
-
-//		XposedHelpers.setStaticIntField(
-//				XposedHelpers.findClass("com.android.internal.policy.impl.PhoneWindowManager$MyOrientationListener$SensorEventListenerImpl", lpparam.classLoader),
-//				"ADJACENT_ORIENTATION_ANGLE_GAP", 180);
-//
-//		findAndHookMethod("com.android.internal.policy.impl.PhoneWindowManager$MyOrientationListener$SensorEventListenerImpl", 
-//					lpparam.classLoader,
-//					"isOrientationAngleAcceptableLocked",
-//					int.class,
-//					int.class,
-//					new XC_MethodHook() {
-//				@Override
-//				protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-//					XposedBridge.log("orientation switch "+(Boolean)param.getResult()+" "+(Integer)param.args[0]+" "+(Integer)param.args[1]);
-//				}
-//				protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-//				}
-//			});
-//		XposedBridge.log("Edited orientation gap");
-//	}
-
-	//	private void btLog(LoadPackageParam lpparam) {
-	//		XposedBridge.log("Bluetooth logging enabled");
-	//		findAndHookMethod("android.bluetooth.BluetoothSocket", lpparam.classLoader,
-	//				"write", byte[].class, int.class, int.class, new XC_MethodHook() {
-	//			@Override
-	//			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-	//				XposedBridge.log("write");
-	//				bti.log(true, (byte[])param.args[0], (Integer)param.args[0], (Integer)param.args[1]);
-	//			}
-	//		});
-	//		findAndHookMethod("android.bluetooth.BluetoothSocket", lpparam.classLoader,
-	//				"read", byte[].class, int.class, int.class, new XC_MethodHook() {
-	//			@Override
-	//			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-	//				XposedBridge.log("read");
-	//				bti.log(false, (byte[])param.args[0], (Integer)param.args[1], (Integer)param.getResult());
-	//			}
-	//		});
-	//	}
+	private void swypeNoEmoji(LoadPackageParam lpparam) {
+		findAndHookMethod("android.content.res.Resources", lpparam.classLoader,
+				"getBoolean", int.class, new XC_MethodHook() {
+			@Override
+			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+				if ((Boolean)param.getResult() && 
+						((Resources)param.thisObject).getResourceEntryName(
+								(Integer)param.args[0]).equals("enable_emoji_in_english_ldb")) 
+					param.setResult(false);
+			}
+			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+			}
+		});
+	}
 
 	private void autoFlipAppPatch(LoadPackageParam lpparam) {
 		findAndHookMethod(Activity.class, "setRequestedOrientation", int.class, new XC_MethodHook() {
@@ -238,6 +258,55 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpo
 		});
 	}
 
+	//	public void hookPaint(LoadPackageParam lpparam) {
+	//		XposedBridge.log("hookPaint()");
+	//		try {
+	//			XposedBridge.hookAllConstructors(
+	//					Class.forName("android.graphics.Paint", false, lpparam.classLoader), 
+	//					new XC_MethodHook() {
+	//						@Override
+	//						protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+	//					        ((Paint)param.thisObject).setColorFilter(colorFilters[COLOR_MODE_RED]);
+	//						}
+	//					}
+	//					);
+	//		} catch (ClassNotFoundException e) {
+	//			XposedBridge.log("Paint constructor hook "+e);
+	//		}
+	//
+	//		/*try {
+	//			findAndHookMethod(
+	//					Class.forName("android.graphics.Paint", false, lpparam.classLoader), 
+	//					"setColorFilter",
+	//					ColorFilter.class,
+	//					new XC_MethodHook() {
+	//						@Override
+	//						protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+	//							param.args[0] = colorFilters[COLOR_MODE_RED];
+	//						}
+	//					}
+	//					);
+	//		} catch (ClassNotFoundException e) {
+	//			XposedBridge.log("Paint filter hook "+e);
+	//		}*/
+	//	
+	//		/* try {
+	//			findAndHookMethod(
+	//					Class.forName("android.graphics.Paint", false, lpparam.classLoader), 
+	//					"getColorFilter",
+	//					new XC_MethodHook() {
+	//						@Override
+	//						protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+	//							param.setResult(new ColorMatrixColorFilter(new ColorMatrix(
+	//			                        colorMatrices[COLOR_MODE_RED_ON_BLACK])));
+	//						}
+	//					}
+	//					);
+	//		} catch (ClassNotFoundException e) {
+	//			XposedBridge.log("Paint filter hook "+e);
+	//		} */
+	//	
+	//	}
 
 	public void kindleGreenPatch(LoadPackageParam lpparam) {
 		findAndHookMethod("android.content.res.Resources", lpparam.classLoader,
@@ -285,6 +354,8 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpo
 				@Override
 				protected void afterHookedMethod(MethodHookParam param) throws Throwable {
 				}
+
+				@Override
 				protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
 					XposedBridge.log("Requested velocity "+(Float)param.args[2]);
 					if (Math.abs((Float)param.args[2]) < 1e-6f) {
