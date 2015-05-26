@@ -26,6 +26,7 @@ public class Main extends Activity {
 	public static final String PREF_AUTO_FLIP = "autoFlip";
 	public static final String PREF_NO_SWYPE_EMOJI = "noSwypeEmoji";
 	public static final String PREF_NO_WAKE = "noWake";
+	public static final String PREF_FORCE_IMMERSIVE = "forceImmersive";
 	
 	@SuppressLint("WorldReadableFiles")
 	@Override
@@ -59,6 +60,7 @@ public class Main extends Activity {
         setter(R.id.kindle_fast_turn, PREF_KINDLE_FAST_TURN, false);
         setter(R.id.auto_flip, PREF_AUTO_FLIP, false);
         setter(R.id.no_wake, PREF_NO_WAKE, false);
+        setter(R.id.force_immersive, PREF_FORCE_IMMERSIVE, false);
 	}
 
 	private void setter(int id, final String prefString, boolean defaultState) {

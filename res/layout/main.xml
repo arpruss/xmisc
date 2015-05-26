@@ -38,4 +38,8 @@
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
     android:text="No charging-related wakeups"/>
+<CheckBox android:id="@+id/force_immersive"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:text="Lock immersive mode for restricted users (3-4 swipes to leave)"/>
 </LinearLayout>

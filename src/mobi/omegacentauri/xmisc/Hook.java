@@ -4,6 +4,7 @@ import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 
 import android.annotation.SuppressLint;
@@ -31,6 +32,7 @@ import android.hardware.SensorEventListener;
 import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Environment;
+import android.os.UserHandle;
 import android.preference.PreferenceManager;
 import android.util.DisplayMetrics;
 import android.view.Display;
@@ -53,6 +55,7 @@ import de.robv.android.xposed.callbacks.XC_InitPackageResources.InitPackageResou
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 import static de.robv.android.xposed.XposedHelpers.findAndHookMethod;
 
+@SuppressLint("NewApi")
 public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
 	static String MODULE_PATH;
 	static final String[] replace = {
@@ -69,6 +72,9 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
 	};
 	static final int NOID = -1;
 	static WindowManager wm = null;
+	static int statusbarSwipes = 0;
+	static long previousSwipeTime = 0;
+	static int curUser = 0;
 
 	@Override
 	public void initZygote(IXposedHookZygoteInit.StartupParam startupParam) throws Throwable {
@@ -77,7 +83,7 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
 		prefs.makeWorldReadable();
 
 		XposedBridge.log("xmisc: hello");
-
+		
 		if (prefs.getBoolean(Main.PREF_DISABLE_HOLO, false))
 			XResources.setSystemWideReplacement(
 					"android", "drawable", "background_holo_dark", new XResources.DrawableLoader() {
@@ -92,6 +98,51 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
 
 		if (prefs.getBoolean(Main.PREF_NO_WAKE, false))
 			wirelessWakeupPatch();
+		
+		if (prefs.getBoolean(Main.PREF_FORCE_IMMERSIVE, false))
+			switchUserPatch();
+	}
+	
+	private void switchUserPatch() {
+		XposedBridge.log("xmisc: switch user patch");
+
+		findAndHookMethod("com.android.server.am.ActivityManagerService", null, 
+				"switchUser", 
+				int.class, 
+				new XC_MethodHook() {
+
+			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+				if ((Boolean)param.getResult()) {
+					curUser = (Integer)param.args[0];
+					XposedBridge.log("xmisc: switched to user "+curUser);
+				}
+			}
+
+		});
+	}
+
+	private void updateVisibilityPatch(LoadPackageParam param) {
+		XposedBridge.log("xmisc: patching updVis");
+		findAndHookMethod("com.android.internal.policy.impl.BarController", param.classLoader, 
+				"updateVisibilityLw", 
+				boolean.class, int.class, int.class, 
+				new XC_MethodHook() {
+			@Override
+			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+				if (curUser >= 10 && (Boolean)param.args[0]) {
+					if (System.currentTimeMillis() < 500 + previousSwipeTime)
+						statusbarSwipes++;
+					else
+						statusbarSwipes = 0;
+					previousSwipeTime = System.currentTimeMillis();
+					if (statusbarSwipes < 4) {
+						param.args[0] = false;
+						XposedBridge.log("xmisc: updVis patched away");
+					}
+					XposedBridge.log("xmisc: updVis "+(Boolean)param.args[0]+ " "+String.format("%x %x", (Integer)param.args[1], (Integer)param.args[2]));
+				}
+			}
+		});
 	}
 	
 	private void wirelessWakeupPatch() {
@@ -199,6 +250,16 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
 		//		if (lpparam.packageName.endsWith(".gm"))
 		//			orientationPatch(lpparam);
 
+		if (lpparam.packageName.startsWith("com.android.providers.settings")) 
+		{
+			XposedBridge.log("xmisc: "+lpparam.packageName);
+			updateVisibilityPatch(lpparam);
+		}
+		
+		if (lpparam.packageName.startsWith("com.android.providers.settigs")) {
+			updateVisibilityPatch(lpparam);
+		}
+		
 		if (prefs.getBoolean(Main.PREF_AUTO_FLIP, false))
 			autoFlipAppPatch(lpparam);
 
@@ -225,6 +286,38 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
 //		if (lpparam.packageName.startsWith("com.nuance.swype") &&
 //				prefs.getBoolean(Main.PREF_NO_SWYPE_EMOJI, false))
 //			swypeNoEmoji(lpparam);
+
+//		if (lpparam.packageName.equals("com.android.systemui"))
+//			patchImmersive(lpparam);
+	}
+
+	private void patchImmersive(LoadPackageParam lpparam) {
+		// 	3c001202, 0c001202
+		XposedBridge.log("xmisc: Immersive patch");
+		findAndHookMethod("com.android.systemui.statusbar.phone.PhoneStatusBar", lpparam.classLoader, 
+				"setSystemUiVisibility", 
+				int.class, int.class, 
+				new XC_MethodHook() {
+			@Override
+			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+				if ((Integer)param.args[0] == 0x3c001202 && (Integer)param.args[1] == 0xFFFFFFFF) {
+					XposedBridge.log("xmisc: patched");
+					param.args[1] = 0;
+				}
+				XposedBridge.log("xmisc: setUiVis "+String.format("%x %x", (Integer)param.args[0], (Integer)param.args[1]));
+			}
+		});
+		
+		findAndHookMethod("com.android.internal.policy.impl.BarController", lpparam.classLoader, 
+				"updateVisibilityLw", 
+				boolean.class, int.class, int.class, 
+				new XC_MethodHook() {
+			@Override
+			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+				XposedBridge.log("xmisc: updVis "+(Boolean)param.args[0]+ " "+String.format("%x %x", (Integer)param.args[1], (Integer)param.args[2]));
+			}
+		});
+		
 
 	}
 
