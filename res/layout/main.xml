@@ -42,4 +42,8 @@
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
     android:text="Lock immersive mode for restricted users (3-4 swipes to leave)"/>
+<CheckBox android:id="@+id/restrict_markets"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:text="Block com.amazon.* and Google Play for restricted users"/>
 </LinearLayout>

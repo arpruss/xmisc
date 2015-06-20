@@ -31,8 +31,10 @@ import android.graphics.drawable.Drawable;
 import android.hardware.SensorEventListener;
 import android.os.BatteryManager;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Environment;
 import android.os.UserHandle;
+import android.os.UserManager;
 import android.preference.PreferenceManager;
 import android.util.DisplayMetrics;
 import android.view.Display;
@@ -74,7 +76,7 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
 	static WindowManager wm = null;
 	static int statusbarSwipes = 0;
 	static long previousSwipeTime = 0;
-	static int curUser = 0;
+	static volatile int curUser = 0;
 
 	@Override
 	public void initZygote(IXposedHookZygoteInit.StartupParam startupParam) throws Throwable {
@@ -99,7 +101,7 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
 		if (prefs.getBoolean(Main.PREF_NO_WAKE, false))
 			wirelessWakeupPatch();
 		
-		if (prefs.getBoolean(Main.PREF_FORCE_IMMERSIVE, false))
+		if (prefs.getBoolean(Main.PREF_FORCE_IMMERSIVE, false))// || prefs.getBoolean(Main.PREF_RESTRICT_MARKETS, false))
 			switchUserPatch();
 	}
 	
@@ -139,7 +141,7 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
 						param.args[0] = false;
 						XposedBridge.log("xmisc: updVis patched away");
 					}
-					XposedBridge.log("xmisc: updVis "+(Boolean)param.args[0]+ " "+String.format("%x %x", (Integer)param.args[1], (Integer)param.args[2]));
+//					XposedBridge.log("xmisc: updVis "+(Boolean)param.args[0]+ " "+String.format("%x %x", (Integer)param.args[1], (Integer)param.args[2]));
 				}
 			}
 		});
@@ -250,13 +252,16 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
 		//		if (lpparam.packageName.endsWith(".gm"))
 		//			orientationPatch(lpparam);
 
-		if (lpparam.packageName.startsWith("com.android.providers.settings")) 
-		{
-			XposedBridge.log("xmisc: "+lpparam.packageName);
-			updateVisibilityPatch(lpparam);
+		if (prefs.getBoolean(Main.PREF_RESTRICT_MARKETS, false) &&  
+				( lpparam.packageName.startsWith("com.amazon.") ||
+						lpparam.packageName.startsWith("com.android.vending"))) {
+			XposedBridge.log("xmisc restrict markets: "+lpparam.packageName);
+			fixMarket(lpparam);
 		}
 		
-		if (lpparam.packageName.startsWith("com.android.providers.settigs")) {
+		if (prefs.getBoolean(Main.PREF_FORCE_IMMERSIVE, false) &&
+				lpparam.packageName.startsWith("com.android.providers.settings")) {
+			XposedBridge.log("xmisc: "+lpparam.packageName);
 			updateVisibilityPatch(lpparam);
 		}
 		
@@ -290,6 +295,27 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
 //		if (lpparam.packageName.equals("com.android.systemui"))
 //			patchImmersive(lpparam);
 	}
+	
+	private void fixMarket(final LoadPackageParam lpparam) {
+		XposedBridge.log("xmisc fixMarket");
+		findAndHookMethod("android.app.Activity", lpparam.classLoader, 
+				"onResume", 
+				new XC_MethodHook() {
+			@Override
+			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+				String c = param.thisObject.getClass().toString();
+				if (c.endsWith("com.google.android.finsky.activities.MainActivity") ||
+						c.endsWith("com.amazon.venezia.Venezia")) { 
+					UserManager u = (UserManager) ((Activity)param.thisObject).getSystemService(Context.USER_SERVICE);
+					Bundle r = u.getUserRestrictions();
+					if (!r.isEmpty()) {
+						XposedBridge.log("have restrictions");
+						((Activity)param.thisObject).finish();
+					}
+				}
+			}			
+		});
+	}
 
 	private void patchImmersive(LoadPackageParam lpparam) {
 		// 	3c001202, 0c001202
@@ -304,19 +330,19 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
 					XposedBridge.log("xmisc: patched");
 					param.args[1] = 0;
 				}
-				XposedBridge.log("xmisc: setUiVis "+String.format("%x %x", (Integer)param.args[0], (Integer)param.args[1]));
+//				XposedBridge.log("xmisc: setUiVis "+String.format("%x %x", (Integer)param.args[0], (Integer)param.args[1]));
 			}
 		});
 		
-		findAndHookMethod("com.android.internal.policy.impl.BarController", lpparam.classLoader, 
-				"updateVisibilityLw", 
-				boolean.class, int.class, int.class, 
-				new XC_MethodHook() {
-			@Override
-			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-				XposedBridge.log("xmisc: updVis "+(Boolean)param.args[0]+ " "+String.format("%x %x", (Integer)param.args[1], (Integer)param.args[2]));
-			}
-		});
+//		findAndHookMethod("com.android.internal.policy.impl.BarController", lpparam.classLoader, 
+//				"updateVisibilityLw", 
+//				boolean.class, int.class, int.class, 
+//				new XC_MethodHook() {
+//			@Override
+//			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+//				XposedBridge.log("xmisc: updVis "+(Boolean)param.args[0]+ " "+String.format("%x %x", (Integer)param.args[1], (Integer)param.args[2]));
+//			}
+//		});
 		
 
 	}
