@@ -9,6 +9,7 @@ import java.util.ArrayList;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.Notification;
 import android.bluetooth.BluetoothSocket;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -77,6 +78,10 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
 	static int statusbarSwipes = 0;
 	static long previousSwipeTime = 0;
 	static volatile int curUser = 0;
+	static String[][] notificationFilter = {
+		{"com.accuweather.android", "flash flood"},
+		{"com.accuweather.android", "areal flood"}
+	};
 
 	@Override
 	public void initZygote(IXposedHookZygoteInit.StartupParam startupParam) throws Throwable {
@@ -287,7 +292,19 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
 				kindleFastTurn(lpparam);
 			kindleFastTurn(lpparam);
 		}		
-
+		
+		if (prefs.getBoolean(Main.PREF_FILTER_NOTIFICATION, false)) {
+			boolean patch = false;
+			for (String[] line : notificationFilter) {
+				if (line[0].equals(lpparam.packageName)) {
+					patch = true;
+					break;
+				}
+			}
+			if (patch) 
+				notificationFilterPatch(lpparam);
+		}
+		
 //		if (lpparam.packageName.startsWith("com.nuance.swype") &&
 //				prefs.getBoolean(Main.PREF_NO_SWYPE_EMOJI, false))
 //			swypeNoEmoji(lpparam);
@@ -312,6 +329,44 @@ public class Hook implements IXposedHookZygoteInit, IXposedHookLoadPackage {
 						XposedBridge.log("have restrictions");
 						((Activity)param.thisObject).finish();
 					}
+				}
+			}			
+		});
+	}
+	
+	private boolean notificationFilter(String pkg, Notification n) {
+		String ticker = n.tickerText.toString().toLowerCase();
+		for (String[] line : notificationFilter){
+			if (line[0].equals(pkg) && ticker.contains(line[1]))
+				return true;
+		}
+		return false;
+	}	
+	
+	private void notificationFilterPatch(final LoadPackageParam lpparam) {
+		final String pkg = lpparam.packageName;
+		XposedBridge.log("xmisc: notification filter");
+		findAndHookMethod("android.app.NotificationManager", lpparam.classLoader, 
+				"notify", int.class, Notification.class,
+				new XC_MethodHook() {
+			@Override
+			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+				Notification n = (Notification)param.args[1];
+				if (notificationFilter(pkg, n)) {
+					XposedBridge.log("xmisc: filtering notification");
+					param.setResult(null);
+				}
+			}			
+		});
+		findAndHookMethod("android.app.NotificationManager", lpparam.classLoader, 
+				"notify", String.class, int.class, Notification.class,
+				new XC_MethodHook() {
+			@Override
+			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+				Notification n = (Notification)param.args[2];
+				if (notificationFilter(pkg,n)) {
+					XposedBridge.log("filtering notification");
+					param.setResult(null);
 				}
 			}			
 		});

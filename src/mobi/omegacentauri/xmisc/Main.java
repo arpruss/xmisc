@@ -28,6 +28,7 @@ public class Main extends Activity {
 	public static final String PREF_NO_WAKE = "noWake";
 	public static final String PREF_FORCE_IMMERSIVE = "forceImmersive";
 	public static final String PREF_RESTRICT_MARKETS = "noMarket";
+	public static final String PREF_FILTER_NOTIFICATION = "filterNotifications";
 	
 	@SuppressLint("WorldReadableFiles")
 	@Override
@@ -63,6 +64,7 @@ public class Main extends Activity {
         setter(R.id.no_wake, PREF_NO_WAKE, false);
         setter(R.id.force_immersive, PREF_FORCE_IMMERSIVE, false);
         setter(R.id.restrict_markets, PREF_RESTRICT_MARKETS, false);
+        setter(R.id.filter_notifications, PREF_FILTER_NOTIFICATION, false);
 	}
 
 	private void setter(int id, final String prefString, boolean defaultState) {

@@ -46,4 +46,8 @@
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
     android:text="Block com.amazon.* and Google Play for restricted users"/>
+<CheckBox android:id="@+id/filter_notifications"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:text="Filter notifications that annoy me"/>
 </LinearLayout>
